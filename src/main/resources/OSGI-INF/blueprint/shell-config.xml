@@ -17,7 +17,7 @@
 
     <command-bundle xmlns="http://karaf.apache.org/xmlns/shell/v1.1.0">
         <command>
-            <action class="org.onosproject.mao.push.qos.cli.MaoPushQosCommand"/>
+            <action class="org.onosproject.mao.qos.tos.cli.MaoQosTosCommand"/>
         </command>
     </command-bundle>
 

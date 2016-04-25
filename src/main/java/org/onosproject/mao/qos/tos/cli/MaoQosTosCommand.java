@@ -13,24 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onosproject.mao.push.qos.cli;
+package org.onosproject.mao.qos.tos.cli;
 
 import org.apache.karaf.shell.commands.Command;
 import org.onosproject.cli.AbstractShellCommand;
-import org.onosproject.mao.push.qos.intf.MaoPushQosService;
+import org.onosproject.mao.qos.tos.intf.MaoQosTosService;
 
 /**
  * Sample Apache Karaf CLI command
  */
 @Command(scope = "onos", name = "mao-push-qos",
          description = "Mao Push Qos Test")
-public class MaoPushQosCommand extends AbstractShellCommand {
+public class MaoQosTosCommand extends AbstractShellCommand {
 
     @Override
     protected void execute() {
 
-        MaoPushQosService maoPushQosService = AbstractShellCommand.get(MaoPushQosService.class);
+        MaoQosTosService maoQosTosService = AbstractShellCommand.get(MaoQosTosService.class);
 
-        print("Hello %s", maoPushQosService.pushQos());
+        print("Hello %s", maoQosTosService.pushQos());
     }
 }
