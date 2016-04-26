@@ -30,6 +30,8 @@ import org.onlab.packet.UDP;
 import org.onosproject.core.Application;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
+import org.onosproject.mao.qos.api.impl.qdisc.MaoFifoQdiscObj;
+import org.onosproject.mao.qos.api.impl.qdisc.MaoSfqQdiscObj;
 import org.onosproject.mao.qos.api.impl.qdisc.MaoTbfQdiscObj;
 import org.onosproject.mao.qos.tos.intf.MaoQosTosService;
 import org.onosproject.mao.qos.api.impl.classify.MaoHtbClassObj;
@@ -39,7 +41,9 @@ import org.onosproject.mao.qos.intf.MaoQosService;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.device.DeviceService;
+import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
+import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.FlowRule;
 import org.onosproject.net.flow.FlowRuleEvent;
 import org.onosproject.net.flow.FlowRuleListener;
@@ -53,6 +57,9 @@ import org.onosproject.net.flow.criteria.TcpPortCriterion;
 import org.onosproject.net.flow.criteria.UdpPortCriterion;
 import org.onosproject.net.flow.instructions.Instruction;
 import org.onosproject.net.flow.instructions.Instructions;
+import org.onosproject.net.flowobjective.DefaultForwardingObjective;
+import org.onosproject.net.flowobjective.FlowObjectiveService;
+import org.onosproject.net.flowobjective.ForwardingObjective;
 import org.onosproject.net.packet.PacketContext;
 import org.onosproject.net.packet.PacketPriority;
 import org.onosproject.net.packet.PacketProcessor;
@@ -73,8 +80,10 @@ public class MaoQosTos implements MaoQosTosService {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
     private final long DEFAULT_QUEUE_ID = 0x10 - 1;
-    private final long FTP_QUEUE_ID = 0x20 - 1;
+    private final long WGET_QUEUE_ID = 0x20 - 1;
     private final long STREAM_QUEUE_ID = 0x30 - 1;
+    private final String ACCESS_DPID = "of:0001111111111111";
+    private final String CORE_DPID = "of:0002222222222222";
 
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
@@ -90,12 +99,15 @@ public class MaoQosTos implements MaoQosTosService {
     protected FlowRuleService flowRuleService;
 
     @Reference(cardinality = ReferenceCardinality.MANDATORY_UNARY)
-    protected DeviceService deviceService;
+    protected FlowObjectiveService flowObjectiveService;
 
 
     private InnerPacketProcessor innerPacketProcessor;
     private InnerFlowRuleListener innerFlowRuleListener;
     private ApplicationId appId;
+
+    private MaoHtbClassObj parentClass;
+    private int defaultCurrentSpeed;
 
 
     // work with FWD
@@ -194,12 +206,12 @@ public class MaoQosTos implements MaoQosTosService {
 
 
     private void buildDefaultQos() {
-        buildOneDefaultQos(DeviceId.deviceId("of:0001111111111111"), 1);
-        buildOneDefaultQos(DeviceId.deviceId("of:0001111111111111"), 3);
-        buildOneDefaultQos(DeviceId.deviceId("of:0002222222222222"), 1);
-        buildOneDefaultQos(DeviceId.deviceId("of:0002222222222222"), 2);
-        buildOneDefaultQos(DeviceId.deviceId("of:0002222222222222"), 3);
-        buildOneDefaultQos(DeviceId.deviceId("of:0002222222222222"), 4);
+        buildOneDefaultQos(DeviceId.deviceId(ACCESS_DPID), 1);
+        buildOneDefaultQos(DeviceId.deviceId(ACCESS_DPID), 3);
+        buildOneDefaultQos(DeviceId.deviceId(CORE_DPID), 1);
+        buildOneDefaultQos(DeviceId.deviceId(CORE_DPID), 2);
+        buildOneDefaultQos(DeviceId.deviceId(CORE_DPID), 3);
+        buildOneDefaultQos(DeviceId.deviceId(CORE_DPID), 4);
     }
 
     private void buildOneDefaultQos(DeviceId deviceId, int deviceIntfNumber) {
@@ -219,12 +231,17 @@ public class MaoQosTos implements MaoQosTosService {
                 .setHandleOrClassId("1:5")
                 .setDeviceId(deviceId)
                 .setDeviceIntfNumber(deviceIntfNumber)
-                .rate(10, MaoQosObj.RATE_MBIT)
-                .ceil(10, MaoQosObj.RATE_MBIT)
+                .rate(18, MaoQosObj.RATE_MBIT)
+                .ceil(18, MaoQosObj.RATE_MBIT)
                 .burst(10, MaoQosObj.SIZE_MBIT)
                 .cburst(10, MaoQosObj.SIZE_MBIT)
                 .build();
         maoQosService.Apply(parentHtbClass);
+
+        if (parentClass == null) {
+            parentClass = parentHtbClass;
+        }
+
 
         MaoHtbClassObj leafHtbClass = MaoHtbClassObj.builder()
                 .add()
@@ -233,32 +250,48 @@ public class MaoQosTos implements MaoQosTosService {
                 .setDeviceId(deviceId)
                 .setDeviceIntfNumber(deviceIntfNumber)
                 .rate(1, MaoQosObj.RATE_KBIT)
-                .ceil(10, MaoQosObj.RATE_MBIT)
-                .burst(10, MaoQosObj.SIZE_MBIT)
-                .cburst(10, MaoQosObj.SIZE_MBIT)
+                .ceil(18, MaoQosObj.RATE_MBIT)
+                .burst(1, MaoQosObj.SIZE_MBIT)
+                .cburst(1, MaoQosObj.SIZE_MBIT)
+                .priority(1)
                 .build();
+        defaultCurrentSpeed = 18;
         maoQosService.Apply(leafHtbClass);
-
-        MaoTbfQdiscObj leafTbf = MaoTbfQdiscObj.builder()
+//
+//        MaoTbfQdiscObj leafTbf = MaoTbfQdiscObj.builder()
+//                .add()
+//                .setParent(leafHtbClass)
+//                .setHandleOrClassId("10:")
+//                .setDeviceId(deviceId)
+//                .setDeviceIntfNumber(deviceIntfNumber)
+//                .rate(10, MaoQosObj.RATE_MBIT)
+//                .burst(10, MaoQosObj.SIZE_MBIT)
+//                .limit(5, MaoQosObj.SIZE_MBYTE)
+//                .build();
+        MaoHtbQdiscObj leafHtb = MaoHtbQdiscObj.builder()
                 .add()
                 .setParent(leafHtbClass)
                 .setHandleOrClassId("10:")
                 .setDeviceId(deviceId)
                 .setDeviceIntfNumber(deviceIntfNumber)
-                .rate(10, MaoQosObj.RATE_MBIT)
-                .burst(10, MaoQosObj.SIZE_MBIT)
-                .limit(5, MaoQosObj.SIZE_MBYTE)
                 .build();
-        maoQosService.Apply(leafTbf);
+        maoQosService.Apply(leafHtb);
     }
 
 
     private class InnerFlowRuleListener implements FlowRuleListener {
 
+        private FlowRuleEvent.Type type;
+
         @Override
         public void event(FlowRuleEvent event) {
 
-            if (event.type().equals(FlowRuleEvent.Type.RULE_ADD_REQUESTED)) {
+            if (//event.type().equals(FlowRuleEvent.Type.RULE_ADDED) //||
+//                    event.type().equals(FlowRuleEvent.Type.RULE_UPDATED) ||
+                    event.type().equals(FlowRuleEvent.Type.RULE_ADD_REQUESTED)
+                    ) {
+
+                type = event.type();
 
                 FlowRule flowRule = event.subject();
 
@@ -269,6 +302,25 @@ public class MaoQosTos implements MaoQosTosService {
 
                 if (!queueInst.isEmpty()) {
                     return;
+                }
+
+
+                PortNumber port;
+
+                List<Instruction> outputInst = flowRule.treatment().allInstructions().stream()
+                        .filter(inst -> inst.type().equals(Instruction.Type.OUTPUT))
+                        .collect(Collectors.toList());
+                if (outputInst.size() > 1) {
+                    log.warn("OUTPUT is more than 1 !!!");
+                    return;
+                } else if (outputInst.isEmpty()) {
+                    log.warn("OUTPUT is not exist !!!");
+                    return;
+                } else {
+                    port = ((Instructions.OutputInstruction) outputInst.get(0)).port();
+                    if (port.equals(PortNumber.CONTROLLER)) {
+                        return;
+                    }
                 }
 
 
@@ -284,54 +336,261 @@ public class MaoQosTos implements MaoQosTosService {
 
                 if (ipSrc != null && ((IPCriterion) ipSrc).ip().equals(IpPrefix.valueOf("10.0.0.1/32"))) {
 
+                    Criterion tcpDst = trafficSelector.getCriterion(Criterion.Type.TCP_DST);
+
+                    if (tcpDst != null && ((TcpPortCriterion) tcpDst).tcpPort().toInt() == 80) { // TODO - CHECK - IS THIS PORT?
+
+                        DeviceId deviceId = flowRule.deviceId();
+                        if (deviceId.equals(DeviceId.deviceId(CORE_DPID)) && port.toLong() == 1) {
+
+                            createWgetQos(deviceId, 1);
+                            setQosQueue(flowRule, WGET_QUEUE_ID, port);
+
+                        } else if (deviceId.equals(DeviceId.deviceId(ACCESS_DPID)) && port.toLong() == 3) {
+
+                            createWgetQos(deviceId, 3);
+                            setQosQueue(flowRule, WGET_QUEUE_ID, port);
+
+                        } else {
+                            setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
+                        }
+
+                    } else {
+                        setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
+                    }
 
                 } else if (ipDst != null && ((IPCriterion) ipDst).ip().equals(IpPrefix.valueOf("10.0.0.1/32"))) {
 
                     Criterion tcpSrc = trafficSelector.getCriterion(Criterion.Type.TCP_SRC);
-                    Criterion udpSrc = trafficSelector.getCriterion(Criterion.Type.UDP_SRC); // TODO - CHECK - IS THIS PORT?
+                    Criterion udpSrc = trafficSelector.getCriterion(Criterion.Type.UDP_SRC);
 
-                    if (tcpSrc != null && ((TcpPortCriterion) tcpSrc).tcpPort().toInt() == 22) {
+                    if (tcpSrc != null && ((TcpPortCriterion) tcpSrc).tcpPort().toInt() == 80) { // TODO - CHECK - IS THIS PORT?
 
-                        // TODO - Create Qos
-                        // TODO - CREATE SET_QUEUE
-                    } else if (udpSrc != null && ((UdpPortCriterion) udpSrc).udpPort().toInt() == 1355) {
+                        DeviceId deviceId = flowRule.deviceId();
+                        if (deviceId.equals(DeviceId.deviceId(CORE_DPID)) && port.toLong() == 4) {
 
-                        // TODO - Create Qos
-                        // TODO - CREATE SET_QUEUE
+                            createWgetQos(deviceId, 4);
+                            setQosQueue(flowRule, WGET_QUEUE_ID, port);
+
+                        } else if (deviceId.equals(DeviceId.deviceId(ACCESS_DPID)) && port.toLong() == 1) {
+
+                            createWgetQos(deviceId, 1);
+                            setQosQueue(flowRule, WGET_QUEUE_ID, port);
+
+                        } else {
+                            setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
+                        }
+
+                    } else if (udpSrc != null/* && ((UdpPortCriterion) udpSrc).udpPort().toInt() == 1355*/) {
+
+                        DeviceId deviceId = flowRule.deviceId();
+                        if (deviceId.equals(DeviceId.deviceId(CORE_DPID)) && port.toLong() == 4) {
+
+                            createStreamQos(deviceId, 4);
+                            setQosQueue(flowRule, STREAM_QUEUE_ID, port);
+
+                        } else if (deviceId.equals(DeviceId.deviceId(ACCESS_DPID)) && port.toLong() == 1) {
+
+                            createStreamQos(deviceId, 1);
+                            setQosQueue(flowRule, STREAM_QUEUE_ID, port);
+
+                        } else {
+                            setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
+                        }
+
+                    } else {
+                        setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
                     }
-
-                    return;
                 }
-
-                setDefaultQueue(flowRule);
-
+                //other hosts use htb default 0
+                return;
             }
         }
 
-        private void setDefaultQueue(FlowRule flowRule) {
+        private boolean streamQos = false;
 
+        private void createStreamQos(DeviceId deviceId, int deviceIntfNumber) {
 
-            List<Instruction> outputInst = flowRule.treatment().allInstructions().stream()
-                    .filter(inst -> inst.type().equals(Instruction.Type.OUTPUT))
-                    .collect(Collectors.toList());
-            if (outputInst.size() > 1) {
-                log.warn("OUTPUT is more than 1 !!!");
-            } else if (outputInst.isEmpty()) {
-                log.warn("OUTPUT is not exist !!!");
-            } else {
-
-                PortNumber port = ((Instructions.OutputInstruction) outputInst.get(0)).port();
-                long queueId = lookupDefaultQueueId(flowRule.deviceId(), port.toLong());
-
-                flowRule.treatment().immediate().add(0, Instructions.setQueue(queueId, port));
-
-                flowRuleService.applyFlowRules(flowRule);
+            if (!streamQos) {
+                defaultCurrentSpeed -= 14;
+                MaoHtbClassObj leafDefaultHtbClass = MaoHtbClassObj.builder()
+                        .change()
+                        .setParent(parentClass)
+                        .setHandleOrClassId("1:10")
+                        .setDeviceId(deviceId)
+                        .setDeviceIntfNumber(deviceIntfNumber)
+                        .rate(1, MaoQosObj.RATE_KBIT)
+                        .ceil(defaultCurrentSpeed, MaoQosObj.RATE_MBIT)
+                        .burst(1, MaoQosObj.SIZE_MBIT)
+                        .cburst(1, MaoQosObj.SIZE_MBIT)
+                        .priority(1)
+                        .build();
+                maoQosService.Apply(leafDefaultHtbClass);
+                streamQos = true;
             }
+            MaoHtbClassObj leafHtbClass = MaoHtbClassObj.builder()
+                    .add()
+                    .setParent(parentClass)
+                    .setHandleOrClassId("1:30")
+                    .setDeviceId(deviceId)
+                    .setDeviceIntfNumber(deviceIntfNumber)
+                    .rate(14, MaoQosObj.RATE_MBIT)
+                    .burst(6, MaoQosObj.SIZE_MBIT)
+                    .ceil(18, MaoQosObj.RATE_MBIT)
+                    .cburst(10, MaoQosObj.SIZE_MBIT)
+                    .priority(1000)
+                    .build();
+
+            maoQosService.Apply(leafHtbClass);
+
+
+            MaoFifoQdiscObj leafFifoQdisc = MaoFifoQdiscObj.builder()
+                    .add()
+                    .setParent(leafHtbClass)
+                    .setHandleOrClassId("30:")
+                    .setDeviceId(deviceId)
+                    .setDeviceIntfNumber(deviceIntfNumber)
+                    .setFifoType(MaoFifoQdiscObj.FifoType.BYTE_FIFO)
+                    .setLimit(10000000)
+                    .build();
+
+            maoQosService.Apply(leafFifoQdisc);
         }
 
-        private long lookupDefaultQueueId(DeviceId deviceId, long deviceIntfNumber) {
-            return DEFAULT_QUEUE_ID;
+        private boolean wgetQos = false;
+
+        private void createWgetQos(DeviceId deviceId, int deviceIntfNumber) {
+
+            int defaultCS = defaultCurrentSpeed;
+            if (streamQos) {
+                defaultCS -= 14;
+            }
+            MaoHtbClassObj leafDefaultHtbClass = MaoHtbClassObj.builder()
+                    .change()
+                    .setParent(parentClass)
+                    .setHandleOrClassId("1:10")
+                    .setDeviceId(deviceId)
+                    .setDeviceIntfNumber(deviceIntfNumber)
+                    .rate(1, MaoQosObj.RATE_KBIT)
+                    .ceil(defaultCS - 3, MaoQosObj.RATE_MBIT)
+                    .burst(1, MaoQosObj.SIZE_MBIT)
+                    .cburst(1, MaoQosObj.SIZE_MBIT)
+                    .priority(1)
+                    .build();
+            maoQosService.Apply(leafDefaultHtbClass);
+            wgetQos = true;
+
+
+            MaoHtbClassObj leafHtbClass = MaoHtbClassObj.builder()
+                    .add()
+                    .setParent(parentClass)
+                    .setHandleOrClassId("1:20")
+                    .setDeviceId(deviceId)
+                    .setDeviceIntfNumber(deviceIntfNumber)
+                    .rate(3, MaoQosObj.RATE_MBIT)
+                    .burst(4, MaoQosObj.SIZE_MBIT)
+                    .ceil(10, MaoQosObj.RATE_MBIT)
+                    .cburst(4, MaoQosObj.SIZE_MBIT)
+                    .priority(10)
+                    .build();
+
+            maoQosService.Apply(leafHtbClass);
+
+
+            MaoSfqQdiscObj leafSfqQdisc = MaoSfqQdiscObj.builder()
+                    .add()
+                    .setParent(leafHtbClass)
+                    .setHandleOrClassId("20:")
+                    .setDeviceId(deviceId)
+                    .setDeviceIntfNumber(deviceIntfNumber)
+                    .setPerturb(60)
+                    .build();
+
+            maoQosService.Apply(leafSfqQdisc);
         }
+
+        private void setQosQueue(FlowRule flowRule, long queueId, PortNumber port) {
+
+            TrafficTreatment.Builder newTTBuilder = DefaultTrafficTreatment.builder()
+                    .immediate()
+                    .add(Instructions.setQueue(queueId, null));
+
+            for (Instruction inst : flowRule.treatment().immediate()) {
+                newTTBuilder.add(inst);
+            }
+
+            newTTBuilder.deferred();
+            for (Instruction inst : flowRule.treatment().deferred()) {
+                newTTBuilder.add(inst);
+            }
+
+            TrafficSelector.Builder newTSBuilder = DefaultTrafficSelector.builder();
+            for (Criterion criterion : flowRule.selector().criteria()) {
+                if (criterion.type().equals(Criterion.Type.UDP_DST) || criterion.type().equals(Criterion.Type.UDP_SRC)) {
+                    newTSBuilder.matchIPProtocol(IPv4.PROTOCOL_UDP);
+                } else {
+                    newTSBuilder.add(criterion);
+                }
+            }
+
+//            FlowRule newFlowRule = DefaultFlowRule.builder()
+//                    .forDevice(flowRule.deviceId())
+//                    .forTable(flowRule.tableId())
+//                    .fromApp(appId)
+//                    .makeTemporary(flowRule.timeout())
+//                    .withPriority(flowRule.priority()+1080)
+//                    .withSelector(flowRule.selector())
+//                    .withTreatment(newTTBuilder.build())
+//                    .build();
+
+            ForwardingObjective forwardingObjective = DefaultForwardingObjective.builder()
+                    .withSelector(newTSBuilder.build())
+                    .withTreatment(newTTBuilder.build())
+                    .withPriority(flowRule.priority() + 1080)
+                    .withFlag(ForwardingObjective.Flag.VERSATILE)
+                    .fromApp(appId)
+//                    .makeTemporary(flowRule.timeout())
+                    .makePermanent()
+                    .add();
+
+            log.info("update flowRule\nEvent Tpye: {}\n{}", type, forwardingObjective.toString());
+
+
+//            flowRuleService.removeFlowRules(flowRule);
+            flowObjectiveService.forward(flowRule.deviceId(), forwardingObjective);
+//            flowRuleService.applyFlowRules(newFlowRule);
+        }
+
+//        @Deprecated
+//        private void setDefaultQueue(FlowRule flowRule, PortNumber port) {
+//
+//            TrafficTreatment.Builder newTTBuilder = DefaultTrafficTreatment.builder()
+//                    .immediate()
+//                    .add(Instructions.setQueue(DEFAULT_QUEUE_ID, port));
+//
+//            for(Instruction inst : flowRule.treatment().immediate()){
+//                newTTBuilder.add(inst);
+//            }
+//
+//            newTTBuilder.deferred();
+//            for(Instruction inst : flowRule.treatment().deferred()){
+//                newTTBuilder.add(inst);
+//            }
+//
+//
+//            FlowRule newFlowRule = DefaultFlowRule.builder()
+//                    .forDevice(flowRule.deviceId())
+//                    .forTable(flowRule.tableId())
+//                    .fromApp(appId)
+//                    .makeTemporary(flowRule.timeout())
+//                    .withPriority(flowRule.priority())
+//                    .withSelector(flowRule.selector())
+//                    .withTreatment(newTTBuilder.build())
+//                    .build();
+//
+//            flowRuleService.applyFlowRules(newFlowRule);
+//        }
+
     }
 
     private class InnerPacketProcessor implements PacketProcessor {
