@@ -53,6 +53,7 @@ import org.onosproject.net.flow.TrafficTreatment;
 import org.onosproject.net.flow.criteria.Criteria;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.criteria.IPCriterion;
+import org.onosproject.net.flow.criteria.IPProtocolCriterion;
 import org.onosproject.net.flow.criteria.TcpPortCriterion;
 import org.onosproject.net.flow.criteria.UdpPortCriterion;
 import org.onosproject.net.flow.instructions.Instruction;
@@ -233,8 +234,8 @@ public class MaoQosTos implements MaoQosTosService {
                 .setDeviceIntfNumber(deviceIntfNumber)
                 .rate(18, MaoQosObj.RATE_MBIT)
                 .ceil(18, MaoQosObj.RATE_MBIT)
-                .burst(10, MaoQosObj.SIZE_MBIT)
-                .cburst(10, MaoQosObj.SIZE_MBIT)
+                .burst(100, MaoQosObj.SIZE_KBYTE)
+                .cburst(100, MaoQosObj.SIZE_KBYTE)
                 .build();
         maoQosService.Apply(parentHtbClass);
 
@@ -251,8 +252,8 @@ public class MaoQosTos implements MaoQosTosService {
                 .setDeviceIntfNumber(deviceIntfNumber)
                 .rate(1, MaoQosObj.RATE_KBIT)
                 .ceil(18, MaoQosObj.RATE_MBIT)
-                .burst(1, MaoQosObj.SIZE_MBIT)
-                .cburst(1, MaoQosObj.SIZE_MBIT)
+                .burst(100, MaoQosObj.SIZE_KBYTE)
+                .cburst(100, MaoQosObj.SIZE_KBYTE)
                 .priority(1)
                 .build();
         defaultCurrentSpeed = 18;
@@ -265,7 +266,7 @@ public class MaoQosTos implements MaoQosTosService {
 //                .setDeviceId(deviceId)
 //                .setDeviceIntfNumber(deviceIntfNumber)
 //                .rate(10, MaoQosObj.RATE_MBIT)
-//                .burst(10, MaoQosObj.SIZE_MBIT)
+//                .burst(100, MaoQosObj.SIZE_KBYTE)
 //                .limit(5, MaoQosObj.SIZE_MBYTE)
 //                .build();
         MaoHtbQdiscObj leafHtb = MaoHtbQdiscObj.builder()
@@ -337,6 +338,8 @@ public class MaoQosTos implements MaoQosTosService {
                 if (ipSrc != null && ((IPCriterion) ipSrc).ip().equals(IpPrefix.valueOf("10.0.0.1/32"))) {
 
                     Criterion tcpDst = trafficSelector.getCriterion(Criterion.Type.TCP_DST);
+                    Criterion ipProto = trafficSelector.getCriterion(Criterion.Type.IP_PROTO);
+
 
                     if (tcpDst != null && ((TcpPortCriterion) tcpDst).tcpPort().toInt() == 80) { // TODO - CHECK - IS THIS PORT?
 
@@ -344,12 +347,50 @@ public class MaoQosTos implements MaoQosTosService {
                         if (deviceId.equals(DeviceId.deviceId(CORE_DPID)) && port.toLong() == 1) {
 
                             createWgetQos(deviceId, 1);
+
                             setQosQueue(flowRule, WGET_QUEUE_ID, port);
 
                         } else if (deviceId.equals(DeviceId.deviceId(ACCESS_DPID)) && port.toLong() == 3) {
 
                             createWgetQos(deviceId, 3);
+
                             setQosQueue(flowRule, WGET_QUEUE_ID, port);
+
+                        } else {
+                            setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
+                        }
+
+                    } else if (tcpDst != null && ((TcpPortCriterion) tcpDst).tcpPort().toInt() == 1355){
+
+
+
+                        DeviceId deviceId = flowRule.deviceId();
+                        if (deviceId.equals(DeviceId.deviceId(CORE_DPID)) && port.toLong() == 3) {
+
+                            createStreamQos(deviceId, 3);
+
+                            setQosQueue(flowRule, STREAM_QUEUE_ID, port);
+
+                        } else if (deviceId.equals(DeviceId.deviceId(ACCESS_DPID)) && port.toLong() == 3) {
+
+                            createStreamQos(deviceId, 3);
+
+                            setQosQueue(flowRule, STREAM_QUEUE_ID, port);
+
+                        } else {
+                            setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
+                        }
+
+                    } else if ((ipProto != null && ((IPProtocolCriterion) ipProto).protocol() == IPv4.PROTOCOL_UDP) || (ipProto == null))  {
+
+                        DeviceId deviceId = flowRule.deviceId();
+                        if (deviceId.equals(DeviceId.deviceId(CORE_DPID)) && port.toLong() == 3) {
+
+                            setQosQueue(flowRule, STREAM_QUEUE_ID, port);
+
+                        } else if (deviceId.equals(DeviceId.deviceId(ACCESS_DPID)) && port.toLong() == 3) {
+
+                            setQosQueue(flowRule, STREAM_QUEUE_ID, port);
 
                         } else {
                             setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
@@ -362,7 +403,7 @@ public class MaoQosTos implements MaoQosTosService {
                 } else if (ipDst != null && ((IPCriterion) ipDst).ip().equals(IpPrefix.valueOf("10.0.0.1/32"))) {
 
                     Criterion tcpSrc = trafficSelector.getCriterion(Criterion.Type.TCP_SRC);
-                    Criterion udpSrc = trafficSelector.getCriterion(Criterion.Type.UDP_SRC);
+                    Criterion ipProto = trafficSelector.getCriterion(Criterion.Type.IP_PROTO);
 
                     if (tcpSrc != null && ((TcpPortCriterion) tcpSrc).tcpPort().toInt() == 80) { // TODO - CHECK - IS THIS PORT?
 
@@ -381,17 +422,36 @@ public class MaoQosTos implements MaoQosTosService {
                             setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
                         }
 
-                    } else if (udpSrc != null/* && ((UdpPortCriterion) udpSrc).udpPort().toInt() == 1355*/) {
+                    } else if (tcpSrc != null && ((TcpPortCriterion) tcpSrc).tcpPort().toInt() == 1355){
 
                         DeviceId deviceId = flowRule.deviceId();
                         if (deviceId.equals(DeviceId.deviceId(CORE_DPID)) && port.toLong() == 4) {
 
                             createStreamQos(deviceId, 4);
+
                             setQosQueue(flowRule, STREAM_QUEUE_ID, port);
 
                         } else if (deviceId.equals(DeviceId.deviceId(ACCESS_DPID)) && port.toLong() == 1) {
 
                             createStreamQos(deviceId, 1);
+                            slowDownDefault(deviceId, 3);
+
+                            setQosQueue(flowRule, STREAM_QUEUE_ID, port);
+
+                        } else {
+                            setQosQueue(flowRule, DEFAULT_QUEUE_ID, port);
+                        }
+
+                    } else if ((ipProto != null && ((IPProtocolCriterion) ipProto).protocol() == IPv4.PROTOCOL_UDP) || (ipProto == null))  {
+
+                        DeviceId deviceId = flowRule.deviceId();
+                        if (deviceId.equals(DeviceId.deviceId(CORE_DPID)) && port.toLong() == 4) {
+
+
+                            setQosQueue(flowRule, STREAM_QUEUE_ID, port);
+
+                        } else if (deviceId.equals(DeviceId.deviceId(ACCESS_DPID)) && port.toLong() == 1) {
+
                             setQosQueue(flowRule, STREAM_QUEUE_ID, port);
 
                         } else {
@@ -407,27 +467,43 @@ public class MaoQosTos implements MaoQosTosService {
             }
         }
 
+
+        private void slowDownDefault(DeviceId deviceId, int deviceIntfNumber){
+
+            int defaultCS = defaultCurrentSpeed;
+            if (wgetQos) {
+                defaultCS -= 3;
+            }
+            if (streamQos) {
+                defaultCS -= 14;
+            }
+            MaoHtbClassObj leafDefaultHtbClass = MaoHtbClassObj.builder()
+                    .change()
+                    .setParent(parentClass)
+                    .setHandleOrClassId("1:10")
+                    .setDeviceId(deviceId)
+                    .setDeviceIntfNumber(deviceIntfNumber)
+                    .rate(1, MaoQosObj.RATE_KBIT)
+                    .ceil(defaultCS, MaoQosObj.RATE_MBIT)
+                    .burst(100, MaoQosObj.SIZE_KBYTE)
+                    .cburst(100, MaoQosObj.SIZE_KBYTE)
+                    .priority(1)
+                    .build();
+            maoQosService.Apply(leafDefaultHtbClass);
+        }
+
+
+
+
         private boolean streamQos = false;
 
         private void createStreamQos(DeviceId deviceId, int deviceIntfNumber) {
 
-            if (!streamQos) {
-                defaultCurrentSpeed -= 14;
-                MaoHtbClassObj leafDefaultHtbClass = MaoHtbClassObj.builder()
-                        .change()
-                        .setParent(parentClass)
-                        .setHandleOrClassId("1:10")
-                        .setDeviceId(deviceId)
-                        .setDeviceIntfNumber(deviceIntfNumber)
-                        .rate(1, MaoQosObj.RATE_KBIT)
-                        .ceil(defaultCurrentSpeed, MaoQosObj.RATE_MBIT)
-                        .burst(1, MaoQosObj.SIZE_MBIT)
-                        .cburst(1, MaoQosObj.SIZE_MBIT)
-                        .priority(1)
-                        .build();
-                maoQosService.Apply(leafDefaultHtbClass);
-                streamQos = true;
-            }
+            streamQos = true;
+
+            slowDownDefault(deviceId, deviceIntfNumber);
+
+
             MaoHtbClassObj leafHtbClass = MaoHtbClassObj.builder()
                     .add()
                     .setParent(parentClass)
@@ -435,10 +511,10 @@ public class MaoQosTos implements MaoQosTosService {
                     .setDeviceId(deviceId)
                     .setDeviceIntfNumber(deviceIntfNumber)
                     .rate(14, MaoQosObj.RATE_MBIT)
-                    .burst(6, MaoQosObj.SIZE_MBIT)
+                    .burst(600, MaoQosObj.SIZE_KBYTE)
                     .ceil(18, MaoQosObj.RATE_MBIT)
-                    .cburst(10, MaoQosObj.SIZE_MBIT)
-                    .priority(1000)
+                    .cburst(1000, MaoQosObj.SIZE_KBYTE)
+                    .priority(7)
                     .build();
 
             maoQosService.Apply(leafHtbClass);
@@ -461,24 +537,10 @@ public class MaoQosTos implements MaoQosTosService {
 
         private void createWgetQos(DeviceId deviceId, int deviceIntfNumber) {
 
-            int defaultCS = defaultCurrentSpeed;
-            if (streamQos) {
-                defaultCS -= 14;
-            }
-            MaoHtbClassObj leafDefaultHtbClass = MaoHtbClassObj.builder()
-                    .change()
-                    .setParent(parentClass)
-                    .setHandleOrClassId("1:10")
-                    .setDeviceId(deviceId)
-                    .setDeviceIntfNumber(deviceIntfNumber)
-                    .rate(1, MaoQosObj.RATE_KBIT)
-                    .ceil(defaultCS - 3, MaoQosObj.RATE_MBIT)
-                    .burst(1, MaoQosObj.SIZE_MBIT)
-                    .cburst(1, MaoQosObj.SIZE_MBIT)
-                    .priority(1)
-                    .build();
-            maoQosService.Apply(leafDefaultHtbClass);
             wgetQos = true;
+
+            slowDownDefault(deviceId, deviceIntfNumber);
+
 
 
             MaoHtbClassObj leafHtbClass = MaoHtbClassObj.builder()
@@ -488,10 +550,10 @@ public class MaoQosTos implements MaoQosTosService {
                     .setDeviceId(deviceId)
                     .setDeviceIntfNumber(deviceIntfNumber)
                     .rate(3, MaoQosObj.RATE_MBIT)
-                    .burst(4, MaoQosObj.SIZE_MBIT)
+                    .burst(400, MaoQosObj.SIZE_KBYTE)
                     .ceil(10, MaoQosObj.RATE_MBIT)
-                    .cburst(4, MaoQosObj.SIZE_MBIT)
-                    .priority(10)
+                    .cburst(400, MaoQosObj.SIZE_KBYTE)
+                    .priority(3)
                     .build();
 
             maoQosService.Apply(leafHtbClass);
