@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onosproject.mao.qos.tos.cli;
+package org.onosproject.mao.qos.tenant.cli;
 
 import org.apache.karaf.shell.commands.Command;
 import org.onosproject.cli.AbstractShellCommand;
-import org.onosproject.mao.qos.tos.intf.MaoQosTosService;
+import org.onosproject.mao.qos.tenant.intf.MaoQosTosService;
 
 /**
  * Sample Apache Karaf CLI command

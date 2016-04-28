@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onosproject.mao.qos.tos.impl;
+package org.onosproject.mao.qos.tenant.impl;
 
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
@@ -27,21 +27,17 @@ import org.onlab.packet.IpPrefix;
 import org.onlab.packet.TCP;
 import org.onlab.packet.TpPort;
 import org.onlab.packet.UDP;
-import org.onosproject.core.Application;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
 import org.onosproject.mao.qos.api.impl.qdisc.MaoFifoQdiscObj;
 import org.onosproject.mao.qos.api.impl.qdisc.MaoSfqQdiscObj;
-import org.onosproject.mao.qos.api.impl.qdisc.MaoTbfQdiscObj;
-import org.onosproject.mao.qos.tos.intf.MaoQosTosService;
+import org.onosproject.mao.qos.tenant.intf.MaoQosTosService;
 import org.onosproject.mao.qos.api.impl.classify.MaoHtbClassObj;
 import org.onosproject.mao.qos.api.impl.qdisc.MaoHtbQdiscObj;
 import org.onosproject.mao.qos.api.intf.MaoQosObj;
 import org.onosproject.mao.qos.intf.MaoQosService;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
-import org.onosproject.net.device.DeviceService;
-import org.onosproject.net.flow.DefaultFlowRule;
 import org.onosproject.net.flow.DefaultTrafficSelector;
 import org.onosproject.net.flow.DefaultTrafficTreatment;
 import org.onosproject.net.flow.FlowRule;
@@ -50,12 +46,10 @@ import org.onosproject.net.flow.FlowRuleListener;
 import org.onosproject.net.flow.FlowRuleService;
 import org.onosproject.net.flow.TrafficSelector;
 import org.onosproject.net.flow.TrafficTreatment;
-import org.onosproject.net.flow.criteria.Criteria;
 import org.onosproject.net.flow.criteria.Criterion;
 import org.onosproject.net.flow.criteria.IPCriterion;
 import org.onosproject.net.flow.criteria.IPProtocolCriterion;
 import org.onosproject.net.flow.criteria.TcpPortCriterion;
-import org.onosproject.net.flow.criteria.UdpPortCriterion;
 import org.onosproject.net.flow.instructions.Instruction;
 import org.onosproject.net.flow.instructions.Instructions;
 import org.onosproject.net.flowobjective.DefaultForwardingObjective;
@@ -116,7 +110,7 @@ public class MaoQosTos implements MaoQosTosService {
     protected void activate() {
         log.info("init...");
 
-        appId = coreService.registerApplication("onos.app.mao.qos.tos");
+        appId = coreService.registerApplication("onos.app.mao.qos.tenant");
 
         buildDefaultQos();
 
@@ -232,10 +226,10 @@ public class MaoQosTos implements MaoQosTosService {
                 .setHandleOrClassId("1:5")
                 .setDeviceId(deviceId)
                 .setDeviceIntfNumber(deviceIntfNumber)
-                .rate(18, MaoQosObj.RATE_MBIT)
-                .ceil(18, MaoQosObj.RATE_MBIT)
-                .burst(100, MaoQosObj.SIZE_KBYTE)
-                .cburst(100, MaoQosObj.SIZE_KBYTE)
+                .rate(18, MaoQosObj.RATE_UNIT.RATE_MBIT)
+                .ceil(18, MaoQosObj.RATE_UNIT.RATE_MBIT)
+                .burst(100, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
+                .cburst(100, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
                 .build();
         maoQosService.Apply(parentHtbClass);
 
@@ -250,10 +244,10 @@ public class MaoQosTos implements MaoQosTosService {
                 .setHandleOrClassId("1:10")
                 .setDeviceId(deviceId)
                 .setDeviceIntfNumber(deviceIntfNumber)
-                .rate(1, MaoQosObj.RATE_KBIT)
-                .ceil(18, MaoQosObj.RATE_MBIT)
-                .burst(100, MaoQosObj.SIZE_KBYTE)
-                .cburst(100, MaoQosObj.SIZE_KBYTE)
+                .rate(1, MaoQosObj.RATE_UNIT.RATE_KBIT)
+                .ceil(18, MaoQosObj.RATE_UNIT.RATE_MBIT)
+                .burst(100, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
+                .cburst(100, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
                 .priority(1)
                 .build();
         defaultCurrentSpeed = 18;
@@ -483,10 +477,10 @@ public class MaoQosTos implements MaoQosTosService {
                     .setHandleOrClassId("1:10")
                     .setDeviceId(deviceId)
                     .setDeviceIntfNumber(deviceIntfNumber)
-                    .rate(1, MaoQosObj.RATE_KBIT)
-                    .ceil(defaultCS, MaoQosObj.RATE_MBIT)
-                    .burst(100, MaoQosObj.SIZE_KBYTE)
-                    .cburst(100, MaoQosObj.SIZE_KBYTE)
+                    .rate(1, MaoQosObj.RATE_UNIT.RATE_KBIT)
+                    .ceil(defaultCS, MaoQosObj.RATE_UNIT.RATE_MBIT)
+                    .burst(100, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
+                    .cburst(100, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
                     .priority(1)
                     .build();
             maoQosService.Apply(leafDefaultHtbClass);
@@ -510,10 +504,10 @@ public class MaoQosTos implements MaoQosTosService {
                     .setHandleOrClassId("1:30")
                     .setDeviceId(deviceId)
                     .setDeviceIntfNumber(deviceIntfNumber)
-                    .rate(14, MaoQosObj.RATE_MBIT)
-                    .burst(600, MaoQosObj.SIZE_KBYTE)
-                    .ceil(18, MaoQosObj.RATE_MBIT)
-                    .cburst(1000, MaoQosObj.SIZE_KBYTE)
+                    .rate(14, MaoQosObj.RATE_UNIT.RATE_MBIT)
+                    .burst(600, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
+                    .ceil(18, MaoQosObj.RATE_UNIT.RATE_MBIT)
+                    .cburst(1000, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
                     .priority(7)
                     .build();
 
@@ -549,10 +543,10 @@ public class MaoQosTos implements MaoQosTosService {
                     .setHandleOrClassId("1:20")
                     .setDeviceId(deviceId)
                     .setDeviceIntfNumber(deviceIntfNumber)
-                    .rate(3, MaoQosObj.RATE_MBIT)
-                    .burst(400, MaoQosObj.SIZE_KBYTE)
-                    .ceil(10, MaoQosObj.RATE_MBIT)
-                    .cburst(400, MaoQosObj.SIZE_KBYTE)
+                    .rate(3, MaoQosObj.RATE_UNIT.RATE_MBIT)
+                    .burst(400, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
+                    .ceil(10, MaoQosObj.RATE_UNIT.RATE_MBIT)
+                    .cburst(400, MaoQosObj.SIZE_UNIT.SIZE_KBYTE)
                     .priority(3)
                     .build();
 
@@ -737,8 +731,8 @@ public class MaoQosTos implements MaoQosTosService {
                 .setDeviceIntfNumber(3)
                 .setParent(htbRoot)
                 .setHandleOrClassId("1:1")
-                .rate(1, MaoHtbClassObj.RATE_GBIT)
-                .burst(20, MaoHtbClassObj.SIZE_MBYTE);
+                .rate(1, MaoHtbClassObj.RATE_UNIT.RATE_GBIT)
+                .burst(20, MaoHtbClassObj.SIZE_UNIT.SIZE_MBYTE);
 
         MaoHtbClassObj htbRootClass = maoHtbClassObjBuilder.build();
 
@@ -746,16 +740,16 @@ public class MaoQosTos implements MaoQosTosService {
         maoHtbClassObjBuilder
                 .setParent(htbRootClass)
                 .setHandleOrClassId("1:2")
-                .rate(1, MaoHtbClassObj.RATE_GBIT)
-                .burst(20, MaoHtbClassObj.SIZE_MBYTE);
+                .rate(1, MaoHtbClassObj.RATE_UNIT.RATE_GBIT)
+                .burst(20, MaoHtbClassObj.SIZE_UNIT.SIZE_MBYTE);
 
         MaoHtbClassObj htbDefaultClass = maoHtbClassObjBuilder.build();
 
 
         maoHtbClassObjBuilder
                 .setHandleOrClassId("1:3")
-                .rate(30, MaoHtbClassObj.RATE_MBIT)
-                .burst(20, MaoHtbClassObj.SIZE_KBYTE);
+                .rate(30, MaoHtbClassObj.RATE_UNIT.RATE_MBIT)
+                .burst(20, MaoHtbClassObj.SIZE_UNIT.SIZE_KBYTE);
 
         MaoHtbClassObj htbLimitClass = maoHtbClassObjBuilder.build();
 
