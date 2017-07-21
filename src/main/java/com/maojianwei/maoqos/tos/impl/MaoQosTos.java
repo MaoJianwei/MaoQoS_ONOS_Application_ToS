@@ -13,8 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onosproject.mao.qos.tenant.impl;
+package com.maojianwei.maoqos.tos.impl;
 
+import com.maojianwei.maoqos.api.impl.classify.MaoHtbClassObj;
+import com.maojianwei.maoqos.api.impl.qdisc.MaoFifoQdiscObj;
+import com.maojianwei.maoqos.api.impl.qdisc.MaoHtbQdiscObj;
+import com.maojianwei.maoqos.api.impl.qdisc.MaoSfqQdiscObj;
+import com.maojianwei.maoqos.api.intf.MaoQosObj;
+import com.maojianwei.maoqos.intf.MaoQosService;
+import com.maojianwei.maoqos.tos.intf.MaoQosTosService;
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
 import org.apache.felix.scr.annotations.Deactivate;
@@ -29,13 +36,6 @@ import org.onlab.packet.TpPort;
 import org.onlab.packet.UDP;
 import org.onosproject.core.ApplicationId;
 import org.onosproject.core.CoreService;
-import org.onosproject.mao.qos.api.impl.qdisc.MaoFifoQdiscObj;
-import org.onosproject.mao.qos.api.impl.qdisc.MaoSfqQdiscObj;
-import org.onosproject.mao.qos.tenant.intf.MaoQosTosService;
-import org.onosproject.mao.qos.api.impl.classify.MaoHtbClassObj;
-import org.onosproject.mao.qos.api.impl.qdisc.MaoHtbQdiscObj;
-import org.onosproject.mao.qos.api.intf.MaoQosObj;
-import org.onosproject.mao.qos.intf.MaoQosService;
 import org.onosproject.net.DeviceId;
 import org.onosproject.net.PortNumber;
 import org.onosproject.net.flow.DefaultTrafficSelector;

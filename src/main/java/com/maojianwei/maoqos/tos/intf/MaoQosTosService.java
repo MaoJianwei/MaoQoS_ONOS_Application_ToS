@@ -1,4 +1,4 @@
-package org.onosproject.mao.qos.tenant.intf;
+package com.maojianwei.maoqos.tos.intf;
 
 /**
  * Created by mao on 4/24/16.

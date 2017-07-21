@@ -20,28 +20,60 @@
     <parent>
         <groupId>org.onosproject</groupId>
         <artifactId>onos-apps</artifactId>
-        <version>1.6.0-SNAPSHOT</version>
-        <relativePath>../pom.xml</relativePath>
+        <version>1.6.0</version>
+        <!--<version>1.6.0-SNAPSHOT</version>-->
+        <!--<relativePath>../pom.xml</relativePath>-->
     </parent>
 
 
-    <artifactId>onos-app-mao-qos-tos</artifactId>
-    <version>1.6.0-SNAPSHOT</version>
+    <groupId>com.maojianwei.maoqos</groupId>
+    <artifactId>mao-qos-example-push-pos-policy-for-type-of-service</artifactId>
+    <version>1.6.0</version>
     <packaging>bundle</packaging>
 
-    <description>Mao Qos ToS</description>
-    <url>http://maojianwei.github.io</url>
+
+    <name>mao-qos-example-push-pos-policy-for-type-of-service</name>
+    <description>MaoQos Example 2: Push QoS policy for Type of Service(ToS).</description>
+    <url>http://www.maojianwei.com/</url>
+    <licenses>
+        <license>
+            <name>Copyright @ 2016-2020 Jianwei Mao, FNLab@BUPT. All Rights Reserved. All unapproved use is banned.</name>
+            <url>http://www.maojianwei.com/</url>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <name>Jianwei Mao</name>
+            <email>maojianwei2020@gmail.com</email>
+        </developer>
+    </developers>
+    <scm>
+        <connection>scm:git:git@github.com:MaoJianwei/MaoQoS_ONOS_Application_ToS.git</connection>
+        <developerConnection>scm:git:git@github.com:MaoJianwei/MaoQoS_ONOS_Application_ToS.git</developerConnection>
+        <url>git@github.com:MaoJianwei/MaoQoS_ONOS_Application_ToS.git</url>
+    </scm>
+    <distributionManagement>
+        <snapshotRepository>
+            <id>mavenCentral_ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>mavenCentral_ossrh</id>
+            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
+
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <onos.version>1.6.0-SNAPSHOT</onos.version>
-        <onos.app.name>onos.app.mao.qos.tos</onos.app.name>
-        <onos.app.version>1.0.0-SNAPSHOT</onos.app.version>
-        <onos.app.title>Mao Qos ToS</onos.app.title>
+        <onos.version>1.6.0</onos.version>
+        <onos.app.name>mao.qos.example.push.pos.policy.for.type.of.service</onos.app.name>
+        <onos.app.version>1.0.0</onos.app.version>
+        <onos.app.title>MaoQos Traffic ToS Service</onos.app.title>
         <onos.app.origin>BigMao Radio Station</onos.app.origin>
         <onos.app.category>default</onos.app.category>
-        <onos.app.url>http://maojianwei.github.io</onos.app.url>
-        <onos.app.readme>Mao Qos ToS</onos.app.readme>
+        <onos.app.url>http://www.maojianwei.com/</onos.app.url>
+        <onos.app.readme>MaoQos Example 2: Push QoS policy for Type of Service(ToS).</onos.app.readme>
     </properties>
 
     <dependencies>
@@ -86,12 +118,12 @@
         <dependency>
             <groupId>org.onosproject</groupId>
             <artifactId>onos-cli</artifactId>
-            <version>1.6.0-SNAPSHOT</version>
+            <version>1.6.0</version>
         </dependency>
         <dependency>
-            <groupId>org.onosproject</groupId>
+            <groupId>com.maojianwei.maoqos</groupId>
             <artifactId>onos-app-mao-qos</artifactId>
-            <version>1.6.0-SNAPSHOT</version>
+            <version>1.6.0</version>
         </dependency>
     </dependencies>
 
@@ -155,6 +187,49 @@
                         <phase>package</phase>
                         <goals>
                             <goal>app</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.0.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>2.10.4</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>1.6</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
                         </goals>
                     </execution>
                 </executions>
